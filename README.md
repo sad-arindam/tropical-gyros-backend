@@ -141,3 +141,12 @@ npx nodemon server.js
 
 ## Frontend Access
 Open `public/index.html` in a browser. Make sure the backend server is running at `http://localhost:5000`.
+
+
+## Screenshots
+
+### image1
+![Products](screenshots/a.png)
+
+### image 2
+![Checkout](screenshots/b.png)
