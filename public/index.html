@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Tropical Gyros - Mini Order</title>
+  <style>
+    body { font-family: Arial; margin: 20px; }
+    h1 { color: #ff6600; }
+    .product { border: 1px solid #ccc; padding: 10px; margin-bottom: 10px; }
+    .cart-item { border-bottom: 1px solid #ccc; padding: 5px 0; }
+    button { margin-left: 5px; }
+  </style>
+</head>
+<body>
+  <h1>Tropical Gyros</h1>
+
+  <h2>Products</h2>
+  <div id="products">Loading products...</div>
+
+  <h2>Cart</h2>
+  <div id="cart">Cart is empty.</div>
+  <strong>Total: $<span id="total">0</span></strong>
+  <hr>
+
+  <h2>Checkout</h2>
+  <label>
+    Fulfillment: 
+    <select id="fulfillment">
+      <option value="TAKEAWAY">Takeaway</option>
+      <option value="DELIVERY">Delivery</option>
+    </select>
+  </label>
+  <div id="deliveryForm" style="display:none;">
+    <input type="text" id="name" placeholder="Name"><br>
+    <input type="text" id="mobile" placeholder="Mobile"><br>
+    <input type="text" id="city" placeholder="City"><br>
+    <input type="text" id="street" placeholder="Street/Apartment"><br>
+  </div>
+  <button onclick="checkout()">Place Order</button>
+
+  <script>
+    const apiBase = "http://localhost:5000/api";
+    let products = [];
+    let cart = [];
+
+    async function loadProducts() {
+      const res = await fetch(apiBase + "/products");
+      products = await res.json();
+      renderProducts();
+    }
+
+    function renderProducts() {
+      const container = document.getElementById("products");
+      container.innerHTML = "";
+      if(products.length === 0) {
+        container.innerText = "No products available.";
+        return;
+      }
+      products.forEach(p => {
+        const div = document.createElement("div");
+        div.className = "product";
+        div.innerHTML = `
+          <strong>${p.name}</strong> - $${p.price.toFixed(2)}<br>
+          ${p.description}<br>
+          <button onclick="addToCart('${p._id}')">Add to Cart</button>
+        `;
+        container.appendChild(div);
+      });
+    }
+
+    function addToCart(productId) {
+      const product = products.find(p => p._id === productId);
+      const item = cart.find(i => i.productId === productId);
+      if(item) item.quantity++;
+      else cart.push({ productId, name: product.name, price: product.price, quantity: 1 });
+      renderCart();
+    }
+
+    function removeFromCart(productId) {
+      cart = cart.filter(i => i.productId !== productId);
+      renderCart();
+    }
+
+    function changeQuantity(productId, delta) {
+      const item = cart.find(i => i.productId === productId);
+      if(item) {
+        item.quantity += delta;
+        if(item.quantity <= 0) removeFromCart(productId);
+      }
+      renderCart();
+    }
+
+    function renderCart() {
+      const container = document.getElementById("cart");
+      container.innerHTML = "";
+      if(cart.length === 0) {
+        container.innerText = "Cart is empty.";
+        document.getElementById("total").innerText = "0";
+        return;
+      }
+      let total = 0;
+      cart.forEach(i => {
+        total += i.price * i.quantity;
+        const div = document.createElement("div");
+        div.className = "cart-item";
+        div.innerHTML = `
+          ${i.name} - $${i.price.toFixed(2)} x ${i.quantity} 
+          <button onclick="changeQuantity('${i.productId}',1)">+</button>
+          <button onclick="changeQuantity('${i.productId}',-1)">-</button>
+          <button onclick="removeFromCart('${i.productId}')">Remove</button>
+        `;
+        container.appendChild(div);
+      });
+      document.getElementById("total").innerText = total.toFixed(2);
+    }
+
+    document.getElementById("fulfillment").addEventListener("change", e => {
+      document.getElementById("deliveryForm").style.display = e.target.value === "DELIVERY" ? "block" : "none";
+    });
+
+    async function checkout() {
+      if(cart.length === 0) { alert("Cart is empty!"); return; }
+
+      const fulfillmentType = document.getElementById("fulfillment").value;
+      let deliveryAddress = {};
+
+      if(fulfillmentType === "DELIVERY") {
+        deliveryAddress = {
+          name: document.getElementById("name").value,
+          mobile: document.getElementById("mobile").value,
+          city: document.getElementById("city").value,
+          street: document.getElementById("street").value
+        };
+      }
+
+      const order = { items: cart, fulfillmentType, deliveryAddress };
+      const res = await fetch(apiBase + "/orders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(order)
+      });
+
+      const data = await res.json();
+      alert("Order Placed! ID: " + data.order.orderId);
+      cart = [];
+      renderCart();
+    }
+
+    loadProducts();
+  </script>
+</body>
+</html>
